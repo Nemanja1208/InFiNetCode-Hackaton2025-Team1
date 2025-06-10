@@ -8,10 +8,10 @@ load_dotenv()
 CLIENT_ID = os.getenv("BLIZZARD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("BLIZZARD_CLIENT_SECRET")
 
-# Function to get access token from Blizzard API
+# ---------- Function to get access token from Blizzard API ----------
 def get_access_token():
     response = requests.post(
-        "https://oauth.battle.net/token",
+        url="https://oauth.battle.net/token",
         data={"grant_type": "client_credentials"},
         auth=(CLIENT_ID, CLIENT_SECRET),
     )

@@ -23,4 +23,4 @@ def create_pipeline():
 if __name__ == "__main__":
     pipeline = create_pipeline()
     load_info = pipeline.run(wow_api_source())
-    print(load_info)
+    # print(load_info)

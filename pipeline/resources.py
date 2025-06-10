@@ -60,7 +60,7 @@ def wow_item_class_indexes():
 
 
 # ---------- Function to fetch item data with pagination ----------
-@dlt.resource(write_disposition="replace", name="wow_items")
+@dlt.resource(write_disposition="merge", name="wow_items", primary_key="id")
 def wow_item_resource():
     access_token = get_access_token()
     headers = {
@@ -71,6 +71,9 @@ def wow_item_resource():
     params = {
         "namespace": "static-eu",
         "orderby": "id",
+        "item_class.name.en_US": "Armor",      # Filter for items in the Weapon class
+        "item_subclass.name.en_US": "Leather",    # Filter for items in the Sword subclass
+        "quality.name.en_US": "Legendary",      # Filter for items with Legendary quality
         "_page": 1,
         "locale": "en_US",
     }
