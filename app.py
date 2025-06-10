@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import duckdb
 
-from pipeline import create_pipeline, wow_api_source
+from pipeline.pipeline import create_pipeline, wow_api_source
 from dotenv import load_dotenv
 
 load_dotenv()

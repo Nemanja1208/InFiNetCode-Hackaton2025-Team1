@@ -1,24 +1,17 @@
+# Import libraries
 import dlt
 import requests
-from dotenv import load_dotenv
-import os
 import json
 
-load_dotenv()
+from .utils import get_access_token
 
-# Ensure you have the required environment variables set
-CLIENT_ID = os.getenv("BLIZZARD_CLIENT_ID")
-CLIENT_SECRET = os.getenv("BLIZZARD_CLIENT_SECRET")
+# ---------- DLT RESOURCES ----------
+# --- Helper function for making a GET request to the API ---
+def _get_results(url, headers, params):
+    response = requests.get(url, headers=headers, params=params) # Send GET request with parameters
+    response.raise_for_status() # Raise an error for failed requests (non-2xx HTTP status)
+    return json.loads(response.content.decode("utf8")) # Decode the JSON response into a dictionary
 
-# Function to get access token from Blizzard API
-def get_access_token():
-    response = requests.post(
-        "https://oauth.battle.net/token",
-        data={"grant_type": "client_credentials"},
-        auth=(CLIENT_ID, CLIENT_SECRET),
-    )
-    response.raise_for_status()
-    return response.json()["access_token"]
 
 # Function to fetch auction house data from the World of Warcraft API
 @dlt.resource(write_disposition="replace", name="wow_auctions")
@@ -40,44 +33,6 @@ def wow_ah_resource(connected_realm_id: int = 1080):
     # Yield the relevant data
     for auction in data.get("auctions", []):
         yield auction
-
-# ---------- Function to fetch item data from the World of Warcraft API ----------
-@dlt.resource(write_disposition="replace", name="wow_items_old")
-def wow_item_resource_old():
-    access_token = get_access_token()
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-
-    url = f"https://eu.api.blizzard.com/data/wow/search/item"
-    params = {
-        "namespace": "static-eu",
-        "orderby": "id",
-        "_page": 1,
-    }
-
-    # Fetch the results using the helper function
-    data = _get_results(url, headers, params)
-
-    # Yield the relevant data
-    for item in data.get("results", []):
-        yield item["data"]
-
-# DLT source function to combine the resources
-@dlt.source
-def wow_api_source(connected_realm_id: int = 1080):
-    yield wow_ah_resource(connected_realm_id)
-    yield wow_item_resource()
-    yield wow_item_class_indexes()
-
-# ---------- Function to create the DLT pipeline ----------
-def create_pipeline():
-    pipeline = dlt.pipeline(
-        pipeline_name="wow_api_data",
-        destination=dlt.destinations.duckdb("wow_api_data.duckdb"),
-        dataset_name="raw"
-    )
-    return pipeline
 
 
 # ---------- Function to fetch item class indexes from the World of Warcraft API ----------
@@ -150,16 +105,3 @@ def wow_item_resource():
 
         # Update the page variable to fetch the next page of results
         page += 1
-
-# --- Helper function for making a GET request to the API ---
-def _get_results(url, headers, params):
-    response = requests.get(url, headers=headers, params=params) # Send GET request with parameters
-    response.raise_for_status() # Raise an error for failed requests (non-2xx HTTP status)
-    return json.loads(response.content.decode("utf8")) # Decode the JSON response into a dictionary
-
-
-# For testing purposes, you can run the pipeline directly
-if __name__ == "__main__":
-    pipeline = create_pipeline()
-    load_info = pipeline.run(wow_api_source())
-    print(load_info)
