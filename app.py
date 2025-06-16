@@ -21,13 +21,11 @@ con = duckdb.connect(pipeline.pipeline_name + ".duckdb")
 auctions_query = """
     SELECT
         a.id,
-        i.name__en_us,
+        a.item__id,
         a.buyout,
         a.quantity,
         a.time_left
     FROM raw.wow_auctions a
-    JOIN raw.wow_items i
-        ON a.item__id = i.id
 """
 
 items_query = """

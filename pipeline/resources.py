@@ -69,6 +69,7 @@ def wow_item_resource():
 
     url = f"https://eu.api.blizzard.com/data/wow/search/item"
     params = {
+        ":region": "eu",
         "namespace": "static-eu",
         "orderby": "id",
         "item_class.name.en_US": "Armor",      # Filter for items in the Weapon class
