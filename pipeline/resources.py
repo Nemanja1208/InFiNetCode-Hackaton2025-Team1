@@ -10,12 +10,16 @@ from .utils import get_access_token
 def _get_results(url, headers, params):
     response = requests.get(url, headers=headers, params=params) # Send GET request with parameters
     response.raise_for_status() # Raise an error for failed requests (non-2xx HTTP status)
+    print(f"Status code: {response.status_code}\n")
+    print(f"Headers: {response.headers}\n")
+    print(f"Response: {response.text}\n")
     return json.loads(response.content.decode("utf8")) # Decode the JSON response into a dictionary
 
 
-# Function to fetch auction house data from the World of Warcraft API
+# ---------- Function to fetch auction house data from the World of Warcraft API ----------
 @dlt.resource(write_disposition="replace", name="wow_auctions")
 def wow_ah_resource(connected_realm_id: int = 1080):
+    print("----- ENTERING AUCTION HOUSE RESOURCE FUNCTION -----")
     access_token = get_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -24,7 +28,6 @@ def wow_ah_resource(connected_realm_id: int = 1080):
     url = f"https://eu.api.blizzard.com/data/wow/connected-realm/{connected_realm_id}/auctions"
     params = {
         "namespace": "dynamic-eu",
-        "locale": "en_EU"
     }
 
     response = requests.get(url, headers=headers, params=params)
@@ -33,11 +36,14 @@ def wow_ah_resource(connected_realm_id: int = 1080):
     # Yield the relevant data
     for auction in data.get("auctions", []):
         yield auction
+    
+    print("----------------------------------------")
 
 
 # ---------- Function to fetch item class indexes from the World of Warcraft API ----------
 @dlt.resource(write_disposition="replace", name="wow_item_class_indexes")
 def wow_item_class_indexes():
+    print("----- ENTERING ITEM CLASS INDEX RESOURCE FUNCTION -----")
     access_token = get_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -46,7 +52,6 @@ def wow_item_class_indexes():
     url = f"https://eu.api.blizzard.com/data/wow/item-class/index"
     params = {
         "namespace": "static-eu",
-        "locale": "en_US",
     }
 
         # Fetch the results using the helper function
@@ -57,11 +62,14 @@ def wow_item_class_indexes():
     # Yield the relevant data
     for item_class in results:
         yield item_class
+    
+    print("----------------------------------------")
 
 
 # ---------- Function to fetch item data with pagination ----------
 @dlt.resource(write_disposition="merge", name="wow_items", primary_key="id")
 def wow_item_resource():
+    print("----- ENTERING ITEM RESOURCE FUNCTION -----")
     access_token = get_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -69,14 +77,13 @@ def wow_item_resource():
 
     url = f"https://eu.api.blizzard.com/data/wow/search/item"
     params = {
-        ":region": "eu",
+        # ":region": "eu",
         "namespace": "static-eu",
         "orderby": "id",
-        "item_class.name.en_US": "Armor",      # Filter for items in the Weapon class
-        "item_subclass.name.en_US": "Leather",    # Filter for items in the Sword subclass
-        "quality.name.en_US": "Legendary",      # Filter for items with Legendary quality
         "_page": 1,
-        "locale": "en_US",
+        "item_class.name.en_US": "Weapon",      # Filter for items in the Weapon class
+        "item_subclass.name.en_US": "Sword",    # Filter for items in the Sword subclass
+        "quality.name.en_US": "Legendary",      # Filter for items with Legendary quality
     }
 
     page = params.get("_page", 1)
@@ -109,3 +116,5 @@ def wow_item_resource():
 
         # Update the page variable to fetch the next page of results
         page += 1
+    
+    print("----------------------------------------")

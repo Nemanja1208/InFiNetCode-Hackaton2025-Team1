@@ -4,15 +4,14 @@ from .resources import wow_ah_resource, wow_item_resource, wow_item_class_indexe
 # ----------- DLT source function to combine the resources -----------
 @dlt.source
 def wow_api_source(connected_realm_id: int = 1080):
-    yield wow_ah_resource(connected_realm_id)
-    yield wow_item_resource()
-    yield wow_item_class_indexes()
+    #return wow_ah_resource(connected_realm_id), wow_item_resource(), wow_item_class_indexes()
+    return wow_item_resource()
 
 # ---------- Function to create the DLT pipeline ----------
 def create_pipeline():
     pipeline = dlt.pipeline(
-        pipeline_name="wow_api_data",
-        destination=dlt.destinations.duckdb("wow_api_data.duckdb"),
+        pipeline_name="wow_test_data",
+        destination=dlt.destinations.duckdb("wow_test_data.duckdb"),
         dataset_name="raw"
     )
     return pipeline
