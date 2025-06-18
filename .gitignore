@@ -199,8 +199,8 @@ cython_debug/
 *.db
 *.wal
 
-# DLT
-*.dlt
+# Secrets
+secrets.toml
 
 # Other
 *test.py
