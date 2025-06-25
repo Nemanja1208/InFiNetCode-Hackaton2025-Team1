@@ -72,7 +72,7 @@ def fetch_ah_commodities():
 
 
 # Returns a list of indexes for item classes
-def fetch_item_classes(): 
+def fetch_item_class_ids(): 
     endpoint = "/data/wow/item-class/index"
     params = {
         "namespace": "static-eu"
@@ -86,8 +86,8 @@ def fetch_item_classes():
     return item_class_ids
 
 # Returns a dictionary of indexes for item subclasses
-def fetch_item_subclasses():
-    item_class_ids = fetch_item_classes()
+def fetch_item_subclasses_ids():
+    item_class_ids = fetch_item_class_ids()
     subclass_dict = {}
 
     for item_class_id in item_class_ids:
@@ -105,12 +105,32 @@ def fetch_item_subclasses():
 
         print(f"Item class {item_class_id} has subclasses: {subclass_ids}")
     return subclass_dict
+# Returns a dictionary with the itemclass names aswell as subclass names
+def fetch_item_subclass_names():
+    item_class_ids = fetch_item_class_ids()
+    subclass_dict = {}
+
+    for item_class_id in item_class_ids:
+        endpoint = f"/data/wow/item-class/{item_class_id}"
+        params = {
+            "namespace": "static-eu",
+            "region": "eu"
+        }
+
+        response = auth_util.get_api_response(endpoint=endpoint, params=params)
+        data = response.json()
+
+        subclass_names = {subclass["id"]: subclass["name"]["en_US"] for subclass in data.get("item_subclasses", [])}
+        subclass_dict[item_class_id] = subclass_names
+
+        print(f"Item class {item_class_id} has subclasses: {subclass_names}")
+    return subclass_dict
 
 
 # Return all items, one rarity, class and subclass at a time
 @dlt.resource(table_name="items", write_disposition="merge", primary_key="id")
 def fetch_items():
-    subclass_dict = fetch_item_subclasses()
+    subclass_dict = fetch_item_subclasses_ids()
     all_items = []
     rarities = [
         "Poor",        # Gray
@@ -171,5 +191,6 @@ def wow_api_source():
 
 
 if __name__ == "__main__":
-    fetch_ah_commodities()
+    #fetch_ah_commodities()
+    fetch_item_subclass_names()
 
