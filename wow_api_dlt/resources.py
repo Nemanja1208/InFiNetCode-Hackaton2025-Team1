@@ -84,6 +84,19 @@ def fetch_item_class_ids():
         print(id["id"])
         item_class_ids.append(id["id"])
     return item_class_ids
+# Returns a list of item class names
+def fetch_item_class_names():
+    endpoint = "/data/wow/item-class/index"
+    params = {
+        "namespace": "static-eu"
+    }
+    item_class_names = {}
+    response = auth_util.get_api_response(endpoint=endpoint, params=params)
+    data = response.json()
+    for item_class in data.get("item_classes", []):
+        item_class_names[item_class["id"]] = item_class["name"]["en_US"]
+        print(f"Item class {item_class['id']} has name: {item_class['name']['en_US']}")
+    return item_class_names
 
 # Returns a dictionary of indexes for item subclasses
 def fetch_item_subclasses_ids():
@@ -125,6 +138,19 @@ def fetch_item_subclass_names():
 
         print(f"Item class {item_class_id} has subclasses: {subclass_names}")
     return subclass_dict
+
+def get_item_class_filters():
+    """returns a dictionary with itemclass names as keys and their subclass names as values"""
+    item_class_names = fetch_item_class_names()
+    subclass_dict = fetch_item_subclass_names()
+
+    item_class_filters = {}
+    for item_class_id, item_class_name in item_class_names.items():
+        item_class_filters[item_class_name] = {
+            "item_class": item_class_name,
+            "item_subclasses": subclass_dict.get(item_class_id, {})
+        }
+    return item_class_filters
 
 
 # Return all items, one rarity, class and subclass at a time
@@ -192,5 +218,7 @@ def wow_api_source():
 
 if __name__ == "__main__":
     #fetch_ah_commodities()
-    fetch_item_subclass_names()
+    #fetch_item_subclass_names()
+    #fetch_item_class_names()
+    get_item_class_filters()
 
