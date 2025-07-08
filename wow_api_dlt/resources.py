@@ -3,10 +3,11 @@ from wow_api_dlt import auth_util,db
 from wow_api_dlt.dlt_util import fetch_realm_ids, fetch_item_class_and_subclasses
 import pandas as pd
 import time
-import datetime
 import sys 
 
-from concurrent.futures import ThreadPoolExecutor, as_completed #this is used to multithreading. we use it to perform multiple API calls in parallel, which can significantly speed up the data fetching process.
+# This is used to multithreading. We use it to perform multiple API calls
+# in parallel, which can significantly speed up the data fetching process.
+from concurrent.futures import ThreadPoolExecutor, as_completed 
 
 # Fetch data about connected realms    
 @dlt.resource(table_name="realm_data", write_disposition="replace")
@@ -21,10 +22,10 @@ def fetch_realm_data():
         response.raise_for_status()
         data = response.json()
         yield data
-        print(f"Yieldat connected realm {realm_id}!")
+        print(f"Yielded connected realm ID: {realm_id}")
 
 
-# Fetch AH items
+# Fetch AH items (excl. commodities)
 @dlt.resource(table_name="auctions", write_disposition="replace")
 def fetch_auction_house_items(test_mode=False):
     time_of_run = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -36,52 +37,77 @@ def fetch_auction_house_items(test_mode=False):
     amount_of_realms = len(realm_ids)
     print(f"Total realms to fetch auction data for: {amount_of_realms}")
 
-    MAX_WORKERS = 10 # Adjust based on API rate limits and network latency for AH data
+    # Adjust based on API rate limits and network latency for AH data
+    MAX_WORKERS = 10 # 10 is a good value that avoids hitting limits
 
     current_processed_realms = 0
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # Submit tasks for each realm ID
-        future_to_realm_id = {
-            executor.submit(
-                auth_util.get_api_response,
-                endpoint=f"/data/wow/connected-realm/{r_id}/auctions",
-                params={"{{connectedRealmId}}": r_id, "namespace": "dynamic-eu"}
-            ): r_id
-            for r_id in realm_ids
-        }
+        # Create an empty dictionary to map each future to its corresponding realm ID
+        future_to_realm_id = {}
+
+        # 1. Loop through all realm IDs that we want to fetch auction data for
+        for r_id in realm_ids:
+            # Construct the API endpoint and params for the current realm
+            endpoint = f"/data/wow/connected-realm/{r_id}/auctions"
+            params = {"{{connectedRealmId}}": r_id, "namespace": "dynamic-eu"}
+
+            # Submit the API request to the thread pool executor
+            # This starts the request in a background thread and returns a Future object immediately
+            future = executor.submit(
+                auth_util.get_api_response,  # The function to run in the thread
+                endpoint=endpoint,           # The API endpoint
+                params=params                # The parameters to include in the request
+            )
+
+            # Store the future along with the realm ID it represents
+            # So later, when the future completes, we know which realm the response belongs to
+            future_to_realm_id[future] = r_id
 
         _update_progress_bar(current_processed_realms, amount_of_realms, "Fetching AH Items")
 
+        # 2. Start processing the futures as soon as they are completed (not in original submit order)
         for future in as_completed(future_to_realm_id):
+            # Get the realm ID associated with this completed future
             realm_id = future_to_realm_id[future]
             
             try:
+                # Get the result of the API call (this will block if not done, but it *is* done here)
                 response = future.result()
-                response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+
+                # Raise an error if the response was a 4xx or 5xx HTTP status
+                response.raise_for_status()
+
+                # Parse the JSON content of the response
                 data = response.json()
                 
+                # If the expected "auctions" key is missing, print a warning and skip this realm
                 if "auctions" not in data:
                     sys.stdout.write(f"\nWarning: 'auctions' key not found for realm ID: {realm_id}. Skipping.\n")
                     sys.stdout.flush()
                     continue
 
+                # Loop through all auction entries returned for this realm
                 for auction in data["auctions"]:
-                    auction["realm_id"] = realm_id # Add realm_id to each auction item
-                    auction["timestamp"] = time_of_run
-                    yield auction 
+                    auction["realm_id"] = realm_id      # Add realm ID to each auction (to track source)
+                    auction["timestamp"] = time_of_run  # Add timestamp of data pull
+                    yield auction  # Yield the enriched auction record to the calling context
+
             except Exception as e:
-                # Print errors on a new line to not interfere with the progress bar
+                # If anything failed (network error, parsing, etc.), print the error
+                # Printing on a new line avoids breaking the progress bar display
                 sys.stdout.write(f"\nError fetching data for realm ID {realm_id}: {e}\n")
                 sys.stdout.flush()
             
+            # Increment the number of processed realms
             current_processed_realms += 1
+
+            # Update the visual progress bar to show current progress
             _update_progress_bar(current_processed_realms, amount_of_realms, "Fetching AH Items")
 
     sys.stdout.write("\n") # Final newline after progress bar completion
     sys.stdout.flush()
     print(f"Finished fetching auction data for {current_processed_realms} realms.")
-
 
 
 # Fetch AH commodities
@@ -109,8 +135,7 @@ def fetch_ah_commodities():
         print(f"Error fetching Auction House Commodities: {e}")
 
 
-
-
+# Fetch media url's
 @dlt.resource(table_name="item_media", write_disposition="replace")
 def fetch_media_hrfs():
     db_path = "wow_api_dbt/wow_api_data.duckdb"
@@ -158,6 +183,7 @@ def fetch_media_hrfs():
         print(f"Current media count: {current_media}/{amount_of_media}: {url}")
 
 
+# Fetch item details
 @dlt.resource()
 def fetch_item_details():
     db_path = "wow_api_dbt/wow_api_data.duckdb"
@@ -263,6 +289,8 @@ def fetch_item_details():
     sys.stdout.flush()
     print(f"Finished fetching details for all items. Total processed: {current_processed_count} successfully.")
 
+
+# UI function for updating progress bar during pipeline runs
 def _update_progress_bar(current, total, desc, bar_length=50):
     """
     Manually updates a console progress bar on the same line.
@@ -278,10 +306,9 @@ def _update_progress_bar(current, total, desc, bar_length=50):
     
     sys.stdout.write(f"\r{desc}: [{arrow}{spaces}] {current}/{total} ({progress:.1%})")
     sys.stdout.flush()
-       
 
 
-
+# Fetch items
 @dlt.resource(table_name="items", write_disposition="merge", primary_key="id")
 def fetch_items():
     print("Starting item data extraction with adaptive filtering...")
@@ -337,6 +364,7 @@ def fetch_items():
     class_count = len(item_class_dict)
     current_class_idx = 0
 
+    # Starts looping through item class id's
     for item_class_id, value in item_class_dict.items():
         current_class_idx += 1
         print(f"\n--- Processing Item Class {item_class_id} ({current_class_idx}/{class_count}) ---")
@@ -344,6 +372,7 @@ def fetch_items():
         subclass_count = len(subclass_ids)
         current_subclass_idx = 0
 
+        # Starts looping through item subclass id's
         for subclass_id in subclass_ids:
             current_subclass_idx += 1
             print(f"  Processing Subclass {subclass_id} ({current_subclass_idx}/{subclass_count}) within Class {item_class_id}")
@@ -354,12 +383,13 @@ def fetch_items():
             # class/subclass hit a page limit.
             subclass_extraction_complete = True
 
+            # Starts looping through item rarities
             for rarity in rarities:
                 current_rarity_idx += 1
                 print(f"    Processing Rarity '{rarity}' ({current_rarity_idx}/{rarity_count}) for Subclass {subclass_id}")
 
                 base_params = {
-                    "namespace": "static-eu", # Adjust as needed (e.g., static-us)
+                    "namespace": "static-eu",
                     "orderby": "id",
                     "item_class.id": item_class_id,
                     "item_subclass.id": subclass_id,
@@ -480,14 +510,15 @@ def fetch_items():
 
 
 
-# @dlt.source that we use in pipeline.run instead of @dlt.resource we use all the resources we want to run in the pipeline
-"""If you want to use a source specific override for the pipeline you can add a list of resources to pick specific runs.
-accepted values are "auctions", "items" and "realm_data". If no list is provided, it will run all resources."""
+# @dlt.source-decorated function that returns all the yields from the different resources
 @dlt.source(name="wow_api_data")
 def wow_api_source(optional_source_list=None,test_mode=False):
     """
     This is the source function that will be used in the pipeline.
     It returns all the resources that we want to run in the pipeline.
+
+    If you want to use a source specific override for the pipeline you can add a list of resources to pick specific runs.
+    accepted values are "auctions", "items" and "realm_data". If no list is provided, it will run all resources.
     """
     if optional_source_list is not None:
         # If an optional source dictionary is provided, we use it to pick resources
@@ -509,6 +540,8 @@ def wow_api_source(optional_source_list=None,test_mode=False):
         #return [fetch_item_details()] 
         return [fetch_media_hrfs(),fetch_ah_commodities(),fetch_auction_house_items(),fetch_items(),fetch_realm_data(),fetch_item_details()] # # For testing purposes, we only run the media fetch resource
 
+
+# For testing
 if __name__ == "__main__":
     fetch_item_details()
 

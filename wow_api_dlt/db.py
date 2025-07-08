@@ -9,12 +9,29 @@ class DuckDBConnection:
         self.db_path = db_path
         self.conn = None
 
+
     def __enter__(self):
+        """
+        Open the DuckDB connection when entering the context.
+
+        Returns:
+            DuckDBConnection: The active connection object.
+        """
         self.conn = ddb.connect(str(self.db_path))
         return self
     
+
     def query(self, query, params=None) -> pd.DataFrame:
-        """Execute a query with optional parameters and return the result."""
+        """
+        Execute a SQL query with optional parameters.
+
+        Args:
+            query (str): The SQL query to execute.
+            params (tuple or list, optional): Parameters to substitute into the query.
+
+        Returns:
+            pd.DataFrame: Resulting data as a pandas DataFrame.
+        """
         try:
             if params: # If parameters are provided, use them in the query
                 return self.conn.execute(query, params).df()
@@ -23,7 +40,8 @@ class DuckDBConnection:
         except Exception as e:
             print(f"Error executing query: {e}")
             return pd.DataFrame()  # Return an empty DataFrame if there's an error
-    
+
+
     def execute(self, query, params=None): # Execute a non-select query
         """Execute a non-select query (e.g., CREATE TABLE, INSERT, etc.)"""
         try:
@@ -34,11 +52,15 @@ class DuckDBConnection:
         except Exception as e:
             print(f"Error executing command: {e}")
 
+
     def register_df(self, name: str, df: pd.DataFrame): # Register a DataFrame as a DuckDB temp table
         """Register a DataFrame as a DuckDB temp table."""
         self.conn.register(name, df)
 
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Close the DuckDB connection when exiting the context.
+        """
         if self.conn:
             self.conn.close()
