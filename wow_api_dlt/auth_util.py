@@ -4,7 +4,7 @@ from dlt.sources.helpers.rest_client import RESTClient
 BASE_URL = "https://eu.api.blizzard.com"
 
 
-
+# Initialize the API client with secrets
 def get_api_client():
     """
     Returns a RESTClient instance configured for the Blizzard API.
@@ -20,14 +20,25 @@ def get_api_client():
         ),
     )
 
+
+# Get response from the API
 def get_api_response(endpoint: str, params: dict = {}):
     """
     Makes a request to the Blizzard API and returns the response.
+
+    Args:
+        endpoint (str): The API endpoint path.
+        params (dict): Query parameters to include in the request.
+
+    Returns:
+        dict: The parsed response from the API.
     """
     client = get_api_client()
     response = client.get(path=endpoint, params=params)
     response.raise_for_status() # Ensure we raise an error for bad responses
     return response
 
+
+# For testing
 if __name__ == "__main__":
     pass
