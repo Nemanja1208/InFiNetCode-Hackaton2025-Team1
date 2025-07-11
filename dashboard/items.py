@@ -176,18 +176,32 @@ def items_page():
             
             # Query the database with the selected item (if selected)
             if selected_id is not None:
-                details_query = f"""
+                item_query = f"""
                     SELECT *
                     FROM refined.mart_items
                     WHERE id = {selected_id}
                     LIMIT 1
                 """
+                item_df = fetch_data_from_db(item_query)
+                if not item_df.empty:
+                    item = item_df.iloc[0].to_dict()
+
+                # Mapping of item detail tables
+                ITEM_DETAIL_TABLES = {
+                    "Weapon": "refined.mart_weapon_details",
+                    "Armor": "refined.mart_armor_details",
+                    # ...
+                }
+
+                details_query = f"""
+                    SELECT *
+                    FROM refined.mart_weapon_details
+                    WHERE id = {selected_id}
+                """
                 details_df = fetch_data_from_db(details_query)
-                if not details_df.empty:
-                    item = details_df.iloc[0].to_dict()
 
             # If an item is selected in the results dataframe
             if item:
-                render_item_details(item)
+                render_item_details(item, details_df)
             else:
                 st.info("Select an item in the results to see its details.")
